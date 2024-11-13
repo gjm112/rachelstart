@@ -54,13 +54,20 @@ rstart <- rstart %>% mutate(month = case_when(substring(month,1,5) == "April" ~ 
                             )
 
 #Ratio column needs to get cleaned.  
-#What are the dates in the first bucnch of rows? 
-
+#What are the dates in the first bunch of rows? 
 table(rstart$org_region_type)
 names(rstart)
 table(rstart[,9])
 names(rstart)[10]
 View(rstart)
+
+
+#Look at demographic differences across the four major clinics
+rstart %>%  select(clinic, num_patients_served_18_40:`num_patients_served_90+`) %>% pivot_longer(cols =  num_patients_served_18_40:`num_patients_served_90+`, names_to = "age_group",values_to = "n") %>% group_by(clinic, age_group) %>% summarize(n = sum(n, na.rm = TRUE)) %>% ggplot(aes(x = clinic, y = n, fill = age_group)) + geom_bar(position="stack", stat="identity")
+rstart %>%  select(clinic, num_patients_served_18_40:`num_patients_served_90+`) %>% pivot_longer(cols =  num_patients_served_18_40:`num_patients_served_90+`, names_to = "age_group",values_to = "n") %>% group_by(clinic, age_group) %>% summarize(n = sum(n, na.rm = TRUE)) %>% ggplot(aes(x = clinic, y = n, fill = age_group)) + geom_bar(position="fill", stat="identity")
+
+
+
 
 #Staffing and outcomes
 rstart <- rstart %>% mutate(n = Number.of.Patients.with.HGB.A1C.under.7.0 + )
