@@ -47,7 +47,7 @@ rstart  <- rstart %>% rename(month = "month_we_are_collecting_april_may_june_jul
                              ratio_rn_manager_to_pcc = "ratio_of_rn_manager_to_primary_care_clinic_serving_over_18_year_old_adults_choose_the_following_1_1_1_ratio_2_3_1_ratio_3_6_1_ratio_4_1_10_or_over_clinics_ratio", 
                              I_coll_barg = "collective_bargaining_unit_in_place_ambulatory_structure_yes_1_no_2",
                              I_cent_rn_staffinng = "centralized_rn_staffing_in_place_for_ambulatory_primary_care_clinics_submitted_yes_1_or_no_2", 
-                             n_rn_hours_worked = "if_centralized_rn_staffing_in_place_for_ambulatory_primary_clinics_submitted_what_are_actual_rn_hours_worked_month_by_that_combined_staff",
+                             n_rn_hours_worked_cent = "if_centralized_rn_staffing_in_place_for_ambulatory_primary_clinics_submitted_what_are_actual_rn_hours_worked_month_by_that_combined_staff",
                              n_a1c = "number_of_patients_with_hgb_a1c_assessed_in_unit_month_collected",
                              n_a1c_under7 = "number_of_patients_with_hgb_a1c_under_7_0",
                              n_a1c_7to79 = "number_of_patients_with_hgb_a1c_under_7_0_7_9in_unit_month_collected",
@@ -75,14 +75,29 @@ rstart  <- rstart %>% rename(month = "month_we_are_collecting_april_may_june_jul
                              n_race_asian = "race_number_of_asian_patients_served_in_unit_month_collected",
                              n_race_white = "race_number_of_caucasian_white_patients_served_in_unit_month_collected",
                              n_race_black = "race_number_of_black_african_american_patients_served_in_unit_month_collected",
-                             
-                             
-                             
-                             
-                             
-                             
-                             
-)
+                             I_tele_rn_staffing = "centralized_telehealth_center_in_place_for_ambulatory_primary_care_clinics_for_the_purposes_of_access_population_health_or_care_coordination_yes_1_or_no_2",
+                             n_rn_hours_worked_tele = "if_centralized_telehealth_center_in_place_for_ambulatory_primary_care_clinics_submitted_what_are_the_actual_hours_worked_month_by_that_combined_staff",
+                             n_patients_served_over18 = "unit_of_measurement_total_number_of_patients_over_18_years_of_age_seen_month_total_number_of_patients_seen_month_visits_telehealth_encounters_rn_visits_month_collected_for_the_6_months_collected_april_thru_september_2022_sum_of_column_u_v_and_w",
+                             n_visits_over18 =  "unit_of_measurement_total_number_of_visits_month_6_months_collected_for_patients_over_18_years_of_age",
+                             n_rn_visits_over18 = "unit_of_measurement_total_number_of_rn_visits_month_6_months_collected_for_patients_over_18_years_of_age",
+                             n_rn_tele_vistis = "unit_of_measurement_total_number_of_rn_tele_or_virtual_visits_month_6_months_collected",
+                             hours_worked_rn = "actual_hours_worked_rn_clinic_month_collected",
+                             hours_worked_apn = "actual_hours_worked_apn_clinic_month_collected",
+                             hours_worked_pa = "actual_hours_worked_pa_clinic_month_collected",
+                             hours_worked_ma = "actual_hours_worked_ma_clinic_month_collected",
+                             hours_worked_md = "actual_hours_worked_md_clinic_month_collected",
+                             hours_worked_lpn = "actual_hours_worked_lpn_clinic_month_collected",
+                             hours_worked_other = "actual_hours_worked_other_ancillary_staff",
+                             hours_worked_contract = "actual_hours_worked_contract_staff_clinic_month_collected",
+                             hours_budgeted_rn = "budgeted_hours_worked_rn_clinic_month_collected",
+                             hours_budgeted_apn = "budgeted_hours_worked_apn_clinic_month_collected",
+                             hours_budgeted_pa = "budgeted_hours_worked_pa_clinic_month_collected",
+                             hours_budgeted_ma = "budgeted_hours_worked_ma_clinic_month_collected",
+                             hours_budgeted_md = "budgeted_hours_worked_md_clinic_month_collected",
+                             hours_budgeted_lpn = "budgeted_hours_worked_lpn_clinic_month_collected",
+                             hours_budgeted_other = "budgeted_hours_worked_other_ancillary_staff_clinic_month_collected",
+                             hours_budgeted_contract = "budgeted_hours_worked_contract_staff_clinic_month_collected"
+                             )
 
 #rstart %>% filter(is.na(num_patients_served_18_40)) %>% select(1:5)
 #UMMC FM @ ATTICA
@@ -91,6 +106,8 @@ rstart <- rstart %>% mutate(month = case_when(substring(month,1,5) == "April" ~ 
                                     substring(month,1,3) == "May" ~ "2022-05-01",
                                     substring(month,1,4) == "June" ~ "2022-06-01",
                                     substring(month,1,4) == "July" ~ "2022-07-01",
+                                    substring(month,1,3) == "Aug" ~ "2022-08-01",
+                                    substring(month,1,3) == "Sep" ~ "2022-09-01",
                                     .default = month),
                              
                             org_region_type = case_when(org_region_type == 1 ~ "rural",
@@ -100,7 +117,30 @@ rstart <- rstart %>% mutate(month = case_when(substring(month,1,5) == "April" ~ 
                                                  org_type == 2 ~ "academic",
                                                  org_type == 3 ~ "integrated",
                                                  org_type == 4 ~ "federally_qualified",
-                                                 org_type == 5 ~ "rural")
+                                                 org_type == 5 ~ "rural",
+                                                 org_type == "Medical Group" ~ "stand_alone",
+                                                 org_type == "2-Academic HealthSystem" ~ "academic"),
+                            I_magnet = case_when(I_magnet == 1 ~ "Yes",
+                                                 I_magnet == 2 ~ "No",
+                                                 .default = I_magnet),
+                            I_magnet_w_amb_struture = case_when(I_magnet_w_amb_struture == 1 ~ "Yes",
+                                                                I_magnet_w_amb_struture == 2 ~ "No",
+                                                                .default = I_magnet_w_amb_struture),
+                            I_stand_alone = case_when(I_stand_alone == 1 ~ "Yes",
+                                                      I_stand_alone == 2 ~ "No",
+                                                      .default = I_stand_alone),
+                            I_chief_nursing_officer_present = case_when(I_chief_nursing_officer_present == 1 ~ "Yes",
+                                                                        I_chief_nursing_officer_present == 2 ~ "No",
+                                                                        .default = I_chief_nursing_officer_present),
+                            I_coll_barg = case_when(I_coll_barg == 1 ~ "Yes",
+                                                    I_coll_barg == 2 ~ "No",
+                                                    .default = I_coll_barg),
+                            I_cent_rn_staffinng = case_when(I_cent_rn_staffinng == 1 ~ "Yes",
+                                                            I_cent_rn_staffinng == 2 ~ "No",
+                                                            .default = I_cent_rn_staffinng),
+                            I_tele_rn_staffing = case_when(I_tele_rn_staffing == 1 ~ "Yes",
+                                                           I_tele_rn_staffing == 2 ~ "No",
+                                                           .default = I_tele_rn_staffing),
                             )
 
 
