@@ -27,6 +27,71 @@ rstart <- rbind(chn, roc, ws, um)
 #Who participated
 rstart <- janitor::clean_names(rstart)
 
+rstart %>% View()
+rstart$number_of_ambulatory_clinics_total_clinics_primary_peds_primary_adult_primary_family_specialty_hospital_based_stand_alone_other
+table(rstart$clinic,rstart$number_of_ambulatory_clinics_total_clinics_primary_peds_primary_adult_primary_family_specialty_hospital_based_stand_alone_other)
+table(rstart$clinic,rstart$number_of_primary_care_clinics_serving_adults_over_18_years_of_age_with_rn_manager)
+table(rstart$clinic,rstart$total_number_of_ambulatory_primary_care_clinics_that_serve_adults_over_18_years_of_age)
+
+table(rstart$clinic,rstart$ratio_of_rn_manager_to_primary_care_clinic_serving_over_18_year_old_adults_choose_the_following_1_1_1_ratio_2_3_1_ratio_3_6_1_ratio_4_1_10_or_over_clinics_ratio)
+table(rstart$clinic,rstart$organization_magnet_status_yes_1_no_2)
+
+table(rstart$clinic,rstart$if_centralized_telehealth_center_in_place_for_ambulatory_primary_care_clinics_submitted_what_are_the_actual_hours_worked_month_by_that_combined_staff)
+
+
+table(rstart$clinic,rstart$gender_at_birth_number_of_patients_who_identify_as_x_gender_at_time_of_birth_in_unit_month)
+table(rstart$clinic,rstart$gender_at_birth_number_of_patients_who_identify_as_unknown_gender_at_time_of_birth_in_unit_month_collected)
+
+
+#Notes: 
+#Variable: number_of_ambulatory_clinics_total_clinics_primary_peds_primary_adult_primary_family_specialty_hospital_based_stand_alone_other
+#um is correct.  All rows should have the same number.  chn should be 78.  roc and ws we can add up and replace the total number. 
+#Columns 7,8,9, and 14
+
+#Drop the column: ratio_of_rn_manager_to_primary_care_clinic_serving_over_18_year_old_adults_choose_the_following_1_1_1_ratio_2_3_1_ratio_3_6_1_ratio_4_1_10_or_over_clinics_ratio
+#We can compute this using: 
+#number_of_primary_care_clinics_serving_adults_over_18_years_of_age_with_rn_manager divided by number_of_primary_care_clinics_serving_adults_over_18_years_of_age_with_rn_manager
+
+#if_centralized_telehealth_center_in_place_for_ambulatory_primary_care_clinics_submitted_what_are_the_actual_hours_worked_month_by_that_combined_staff
+#Each FTE is worth 80 hours
+#5.6*80 = 448 hours
+
+#Race: Black White Asian Other. 
+
+#August 2022 wellstar gender x 50?
+
+#Descriptive stats: 
+
+
+#Regression: 
+#1. Org by org: 
+#2. All 4 orgs together: 
+
+
+#Two models
+glm(cbind(controlled, evaluated) ~ x, family = "binomial")
+#Remove clinics who have no one evaluated.
+
+glm(cbind(evaluated, total) ~ x, family = "binomial")
+
+#random intercept for clinic across the months.  
+
+#To start:
+#logistics regression: number_of_patients_with_hgb_a1c_over_9_0_in_unit_month_collected out of number_of_patients_with_hgb_a1c_assessed_in_unit_month_collected
+#covariates: to start: hours_budgeted_rn (not hours worked) 
+#covariates: patient covariates: demographic covariates: race (White, Black, Asian, Other? or White and Not White?), age (18-40, 41-65, 66+), sex (M, F), insurer (public, private, uninsured)
+#proportion of people serving the patients: rn and ma are the most important.  
+
+  
+#Repeat for bmi, and bp
+  
+#Number measured isn't the same as number in clinic total?   
+  
+table(rstart$clinic, rstart$n_uninsured)
+
+  
+#same for hyper tension and BMI
+
 
 rstart  <- rstart %>% rename(month = "month_we_are_collecting_april_may_june_july_august_september_of_2022_for_each_clinic",
                              org_name = "unit_of_measure_name_primary_clinic_1_primary_clinic_2_etc_if_you_have_150_clinics_you_should_have_150_lines_of_data_submitted_here",
