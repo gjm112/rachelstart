@@ -276,7 +276,8 @@ rstart <- rstart |>
          !(clinic_name == "3049025340"),
          !(clinic_name == "3049000061"),
          !(clinic_name == "UMMC FM @ ATTICA"),
-         !(clinic_name == "Primary Clinic #18")) |>
+         !(clinic_name == "Primary Clinic #18") & 
+         !(clinic_name == "3039000021") ) |>
   mutate(
     p_bp = ifelse(p_bp > 1, 1, p_bp),
     p_bmi = ifelse(p_bmi > 1, 1, p_bmi)
@@ -289,6 +290,39 @@ rstart %>% select(org, p_bmi, p_bp, clinic_name, month) %>% filter(p_bmi > 1 | p
 
 
 ```
+
+# BMI
+```{r}
+##########################################################################
+#BMI
+##########################################################################
+##########################################################################
+#All orgs together
+###########################################################################rn/ma/other, race, age, insurance, gender, ethnicity
+#Probability of assessed
+#Region type: Only include in rochester
+library(lme4)
+mod_bmi_assessed_all <- glmer(
+  cbind(n_bmi, n_total_visits_served_over18) ~ org + p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(hours_budgeted_rn/100) +  I(hours_budgeted_ma/100) + I(hours_budgeted_lpn/100) +  (1|clinic_name),
+  data = rstart,
+  family = "binomial"
+)
+summary(mod_bmi_assessed_all)
+
+
+mod_bmi_controlled_all <- glmer(
+  cbind(n_bmi_over30, n_bmi) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(hours_budgeted_rn/100) +  I(hours_budgeted_ma/100) + I(hours_budgeted_lpn/100) +  (1|clinic_name),
+  data = rstart,
+  family = "binomial"
+)
+summary(mod_bmi_controlled_all)
+
+#Probability of uncontrolled
+mod_a1c_controlled_all <- glm(cbind(n_a1c_over9, n_a1c) ~ p_hours_budgeted_rn + p_hours_budgeted_ma + p_race_black + p_race_asian + p_race_other + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_female + p_ethnicity_hispanic, data = rstart, family = "binomial")
+
+summary(mod_a1c_controlled_all)
+```
+
 
 # A1c
 
