@@ -227,7 +227,7 @@ rstart <- rstart %>% mutate(
 #Missing data
 rstart %>% filter(is.na(n_total_visits_served_over18)) %>%  select(2:4,n_total_visits_served_over18)
 
-rstart %>% filter(is.na(hours_budgeted_rn)) %>%  select(2:4,clinic,hours_budgeted_rn)
+rstart %>% filter(is.na(hours_budgeted_rn)) %>%  select(2:4,org,hours_budgeted_rn)
 
 rstart %>% filter(is.na(hours_budgeted_rn))
 
@@ -239,15 +239,15 @@ rstart %>% filter(is.na(n_bmi)) %>%  select(2:4,n_bmi)
 ```
 
 ```{r}
-ggplot(aes(x = clinic, y = p_a1c) ,data = rstart) + geom_boxplot() + geom_smooth() + geom_hline(yintercept = 1, color = "red")
+ggplot(aes(x = org, y = p_a1c) ,data = rstart) + geom_boxplot() + geom_smooth() + geom_hline(yintercept = 1, color = "red")
 ```
 
 ```{r}
-ggplot(aes(x = clinic, y = p_bmi) ,data = rstart) + geom_boxplot() + geom_smooth() + geom_hline(yintercept = 1, color = "red")
+ggplot(aes(x = org, y = p_bmi) ,data = rstart) + geom_boxplot() + geom_smooth() + geom_hline(yintercept = 1, color = "red")
 ```
 
 ```{r}
-ggplot(aes(x = clinic, y = p_bp) ,data = rstart) + geom_boxplot() + geom_smooth() + geom_hline(yintercept = 1, color = "red")
+ggplot(aes(x = org, y = p_bp) ,data = rstart) + geom_boxplot() + geom_smooth() + geom_hline(yintercept = 1, color = "red")
 ```
 
 # a1c
@@ -264,17 +264,28 @@ Can we look at Telehealth for UM only?
 
 
 ```{r}
-#rstart %>% select(clinic,21:24) 
+# Skip to here for modeling purposes, Greg
 
 rstart <- rstart %>% mutate(p_bmi = n_bmi/n_total_visits_served_over18,
                   p_bp = n_bp/n_total_visits_served_over18,
                   p_a1c = n_a1c/n_total_visits_served_over18)
 
+rstart <- rstart |>
+    filter(!(clinic_name == "3019083950" & month == "2022-09-01"),
+         !(clinic_name == "3019091900" & month == "2022-07-01"),
+         !(clinic_name == "3049025340"),
+         !(clinic_name == "3049000061"),
+         !(clinic_name == "UMMC FM @ ATTICA"),
+         !(clinic_name == "Primary Clinic #18")) |>
+  mutate(
+    p_bp = ifelse(p_bp > 1, 1, p_bp),
+    p_bmi = ifelse(p_bmi > 1, 1, p_bmi)
+  )
 
 
-rstart %>% select(clinic,p_bmi, p_bp, org_name, month) %>% filter(p_bmi > 1 | p_bp > 1) %>% write.csv("./high_bmi_or_bp_rates.csv", row.names = FALSE)
+rstart %>% select(org, p_bmi, p_bp, clinic_name, month) %>% filter(p_bmi > 1 | p_bp > 1) %>% write.csv("./high_bmi_or_bp_rates.csv", row.names = FALSE)
 
-rstart %>% select(clinic,p_bmi, p_bp, org_name, month) %>% filter(p_bmi > 1 | p_bp > 1)
+rstart %>% select(org, p_bmi, p_bp, clinic_name, month) %>% filter(p_bmi > 1 | p_bp > 1)
 
 
 ```
@@ -375,14 +386,14 @@ summary(mod_a1c_controlled_ws)
 ###########################################################################rn/ma/other, race, age, insurance, gender, ethnicity
 #Probability of assessed
 mod_bmi_assessed_all <- glm(
-  cbind(n_bmi, n_total_visits_served_over18) ~  p_hours_budgeted_rn + p_hours_budgeted_ma + p_race_black + p_race_asian + p_race_other + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_female + p_ethnicity_hispanic,
-  data = rstart,
+  cbind(n_bmi, n_total_visits_served_over18) ~  hours_budgeted_rn + p_race_white + + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_female + p_ethnicity_hispanic,
+  data = rstart %>% filter(org == "ws"),
   family = "binomial"
 )
 summary(mod_bmi_assessed_all)
 
 #Probability of uncontrolled
-mod_bmi_controlled_all <- glm(cbind(n_bmi_over30, n_bmi) ~ p_hours_budgeted_rn + p_hours_budgeted_ma + p_race_black + p_race_asian + p_race_other + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_female + p_ethnicity_hispanic, data = rstart, family = "binomial")
+mod_bmi_controlled_all <- glm(cbind(n_bmi_over30, n_bmi) ~ hours_budgeted_rn + p_race_white + + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_female + p_ethnicity_hispanic, data = rstart, family = "binomial")
 
 summary(mod_bmi_controlled_all)
 ```
