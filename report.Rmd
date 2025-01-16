@@ -281,7 +281,8 @@ rstart <- rstart |>
   mutate(
     p_bp = ifelse(p_bp > 1, 1, p_bp),
     p_bmi = ifelse(p_bmi > 1, 1, p_bmi)
-  )
+  ) %>% mutate(org = as.factor(org),
+    org = relevel(org, ref = "um"))
 
 
 rstart %>% select(org, p_bmi, p_bp, clinic_name, month) %>% filter(p_bmi > 1 | p_bp > 1) %>% write.csv("./high_bmi_or_bp_rates.csv", row.names = FALSE)
