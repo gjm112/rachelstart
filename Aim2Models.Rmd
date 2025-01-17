@@ -1,0 +1,518 @@
+---
+title: "Models"
+author: "Sebastian Kirkpatrick"
+date: "2025-01-16"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, message = FALSE) 
+library(tidyverse)
+library(lme4)
+```
+
+```{r, echo=F}
+chn <- read.csv("./cleaneddata20241108/CHN.csv")
+chn <- chn %>% select(-Ethnicity..Number.of.Hispanic.Patients.Served.in.Unit.Month.Collected)
+chn$org <- "chn"
+
+roc <- read.csv("./cleaneddata20241108/ROC.csv")
+roc <- roc %>% select(-Ethnicity..Number.of.Hispanic.Patients.Served.in.Unit.Month.Collected)
+roc$org <- "roc"
+
+um <- read.csv("./cleaneddata20241108/UM.csv")
+um <- um %>% select(-Number.of.Patients.with.HGB.A1C.equal.9.0.in.unit.month.collected, 
+                    -Ethnicity..Number.of.Hispanic.Patients.Served.in.Unit.Month.Collected) %>% 
+  rename(Unit.of.Measurement.Total.Number.of.Patients.over.18.years.of.age.seen.month..Total.number.of.patients.seen.month..visits....telehealth.encounters...RN.Visits.Month.collected.for.the.6.months.collected...April.thru.September.2022...Sum.of.Column.U..V.and.W. = Unit.of.Measurement.Total.Number.of.Patients.over.18.years.of.age.seen.month..Total.number.of.patients.seen.month..visits....telehealth.encounters...RN.Visits.Month.collected.for.the.6.months.collected...April.thru.September.2022...Sum.of.Column.AB..AC..AD.)
+um$org <- "um"
+
+ws <- read.csv("./cleaneddata20241108/WS.csv")
+ws$org <- "ws"
+
+rstart <- rbind(chn, roc, ws, um)
+
+rstart <- janitor::clean_names(rstart)
+```
+
+
+```{r, echo=F}
+rstart  <- rstart %>% rename(month = "month_we_are_collecting_april_may_june_july_august_september_of_2022_for_each_clinic",
+                             clinic_name = "unit_of_measure_name_primary_clinic_1_primary_clinic_2_etc_if_you_have_150_clinics_you_should_have_150_lines_of_data_submitted_here",
+                             clinic_region_type = "organization_region_type_rural_community_urban_rural_1_community_2_urban_3",
+                             clinic_type = "organization_type_stand_alone_medical_group_academic_health_system_integrated_health_system_federally_qualitifed_health_system_rural_health_system_stand_alone_1_academic_2_integrated_3_federally_qualified_4_rural_5",
+                             n_clinics_total = "number_of_ambulatory_clinics_total_clinics_primary_peds_primary_adult_primary_family_specialty_hospital_based_stand_alone_other",
+                             n_clinics_ped_adult = "total_number_of_ambulatory_primary_care_clinics_that_care_for_all_ages_pediatric_through_adult",
+                             n_clinics_adult_only = "total_number_of_ambulatory_primary_care_clinics_that_serve_adults_over_18_years_of_age",
+                             n_patients_served_18_40 = "number_of_patients_served_between_18_40_years_of_age_clinic_month",
+                             n_patients_served_41_65 = "number_of_patients_served_between_41_65_years_of_age_clinic_month",
+                             n_patients_served_66_89 = "number_of_patients_served_between_66_89_years_of_age_clinic_month",
+                             n_patients_served_over89 = "number_of_patients_served_over_89_years_of_age_clinic_month", 
+                             I_magnet = "organization_magnet_status_yes_1_no_2",
+                             I_magnet_w_amb_struture = "organization_magnet_status_inclusive_of_ambulatory_structure_yes_1_no_2",
+                             I_stand_alone = "organization_stand_alone_for_ambulatory_structure_achievement_of_magnet_yes_1_no_2",
+                             I_chief_nursing_officer_present = "chief_nursing_officer_present_for_ambulatory_structure_yes_1_no_2",
+                             n_pcc_w_rn_manager = "number_of_primary_care_clinics_serving_adults_over_18_years_of_age_with_rn_manager", 
+                             ratio_rn_manager_to_pcc = "ratio_of_rn_manager_to_primary_care_clinic_serving_over_18_year_old_adults_choose_the_following_1_1_1_ratio_2_3_1_ratio_3_6_1_ratio_4_1_10_or_over_clinics_ratio", 
+                             I_coll_barg = "collective_bargaining_unit_in_place_ambulatory_structure_yes_1_no_2",
+                             I_cent_rn_staffinng = "centralized_rn_staffing_in_place_for_ambulatory_primary_care_clinics_submitted_yes_1_or_no_2", 
+                             n_rn_hours_worked_cent = "if_centralized_rn_staffing_in_place_for_ambulatory_primary_clinics_submitted_what_are_actual_rn_hours_worked_month_by_that_combined_staff",
+                             n_a1c = "number_of_patients_with_hgb_a1c_assessed_in_unit_month_collected",
+                             n_a1c_under7 = "number_of_patients_with_hgb_a1c_under_7_0",
+                             n_a1c_7to79 = "number_of_patients_with_hgb_a1c_under_7_0_7_9in_unit_month_collected",
+                             n_a1c_8to89 = "number_of_patients_with_hgb_a1c_8_0_8_9_in_unit_month_collected",
+                             n_a1c_over9 = "number_of_patients_with_hgb_a1c_over_9_0_in_unit_month_collected",
+                             n_bmi_over30 = "number_of_patients_with_body_mass_index_over_30_in_unit_month_collected",
+                             n_bmi = "number_of_patients_with_body_mass_index_assessed_in_unit_month_collected",
+                             n_bp_over140_90 = "number_of_patients_with_bp_over_140_90_unit_month_collected",
+                             n_bp = "number_of_patients_blood_pressure_assessed_in_unit_month_collected",
+                             n_uninsured = "number_of_patients_that_are_uninsured_in_unit_month_collected",
+                             n_public_insurance = "number_of_patients_with_public_governmental_payor_in_unit_month_collected",
+                             n_private_insurance = "number_of_patients_with_private_payor_in_unit_month_collected",
+                             n_gender_x = "gender_at_birth_number_of_patients_who_identify_as_x_gender_at_time_of_birth_in_unit_month",
+                             n_gender_unk = "gender_at_birth_number_of_patients_who_identify_as_unknown_gender_at_time_of_birth_in_unit_month_collected",
+                             n_gender_male = "gender_at_birth_number_of_male_patients_served_in_unit_month_collected",
+                             n_gender_female = "gender_at_birth_number_of_female_patients_served_in_unit_month_collected",
+                             n_ethnicity_unreported = "ethnicity_number_of_unreported_ethnicity_patients_served_in_unit_month_collected",
+                             n_ethnicity_non_hispanic = "ethnicity_number_of_non_hispanic_patients_served_in_unit_month_collected",
+                             n_ethnicity_hispanic = "ethnicity_numberof_hispanic_patient_service_in_unit_month_collected",
+                             n_race_unreported = "race_number_of_unreported_race_patients_served_in_unit_month_collected",
+                             n_race_multi = "race_number_of_multiracial_patients_more_than_1_race_identified_served_in_unit_month_collected",
+                             n_race_aiai = "race_number_of_american_indian_alaskan_indian_patients_served_in_unit_month_collected",
+                             n_race_pi = "race_number_of_other_pacific_islander_patients_served_in_unit_month_collected",
+                             n_race_hawaii =  "race_number_of_native_hawaiaan_patients_served_in_unit_month_collected",
+                             n_race_asian = "race_number_of_asian_patients_served_in_unit_month_collected",
+                             n_race_white = "race_number_of_caucasian_white_patients_served_in_unit_month_collected",
+                             n_race_black = "race_number_of_black_african_american_patients_served_in_unit_month_collected",
+                             I_tele_rn_staffing = "centralized_telehealth_center_in_place_for_ambulatory_primary_care_clinics_for_the_purposes_of_access_population_health_or_care_coordination_yes_1_or_no_2",
+                             n_rn_hours_worked_tele = "if_centralized_telehealth_center_in_place_for_ambulatory_primary_care_clinics_submitted_what_are_the_actual_hours_worked_month_by_that_combined_staff",
+                             n_total_visits_served_over18 = "unit_of_measurement_total_number_of_patients_over_18_years_of_age_seen_month_total_number_of_patients_seen_month_visits_telehealth_encounters_rn_visits_month_collected_for_the_6_months_collected_april_thru_september_2022_sum_of_column_u_v_and_w",
+                             n_visits_over18 =  "unit_of_measurement_total_number_of_visits_month_6_months_collected_for_patients_over_18_years_of_age",
+                             n_rn_visits_over18 = "unit_of_measurement_total_number_of_rn_visits_month_6_months_collected_for_patients_over_18_years_of_age",
+                             n_rn_tele_visits = "unit_of_measurement_total_number_of_rn_tele_or_virtual_visits_month_6_months_collected",
+                             hours_worked_rn = "actual_hours_worked_rn_clinic_month_collected",
+                             hours_worked_apn = "actual_hours_worked_apn_clinic_month_collected",
+                             hours_worked_pa = "actual_hours_worked_pa_clinic_month_collected",
+                             hours_worked_ma = "actual_hours_worked_ma_clinic_month_collected",
+                             hours_worked_md = "actual_hours_worked_md_clinic_month_collected",
+                             hours_worked_lpn = "actual_hours_worked_lpn_clinic_month_collected",
+                             hours_worked_other = "actual_hours_worked_other_ancillary_staff",
+                             hours_worked_contract = "actual_hours_worked_contract_staff_clinic_month_collected",
+                             hours_budgeted_rn = "budgeted_hours_worked_rn_clinic_month_collected",
+                             hours_budgeted_apn = "budgeted_hours_worked_apn_clinic_month_collected",
+                             hours_budgeted_pa = "budgeted_hours_worked_pa_clinic_month_collected",
+                             hours_budgeted_ma = "budgeted_hours_worked_ma_clinic_month_collected",
+                             hours_budgeted_md = "budgeted_hours_worked_md_clinic_month_collected",
+                             hours_budgeted_lpn = "budgeted_hours_worked_lpn_clinic_month_collected",
+                             hours_budgeted_other = "budgeted_hours_worked_other_ancillary_staff_clinic_month_collected",
+                             hours_budgeted_contract = "budgeted_hours_worked_contract_staff_clinic_month_collected")
+
+rstart <- rstart %>% mutate(month = case_when(substring(month,1,5) == "April" ~ "2022-04-01",
+                                    substring(month,1,3) == "May" ~ "2022-05-01",
+                                    substring(month,1,4) == "June" ~ "2022-06-01",
+                                    substring(month,1,4) == "July" ~ "2022-07-01",
+                                    substring(month,1,3) == "Aug" ~ "2022-08-01",
+                                    substring(month,1,3) == "Sep" ~ "2022-09-01",
+                                    .default = month),
+                             
+                            clinic_region_type = case_when(clinic_region_type == 1 ~ "rural",
+                                                        clinic_region_type == 2 ~ "community",
+                                                        clinic_region_type == 3 ~ "urban"),
+                            clinic_type = case_when(clinic_type == 1 ~ "stand_alone",
+                                                 clinic_type == 2 ~ "academic",
+                                                 clinic_type == 3 ~ "integrated",
+                                                 clinic_type == 4 ~ "federally_qualified",
+                                                 clinic_type == 5 ~ "rural",
+                                                 clinic_type == "Medical Group" ~ "stand_alone",
+                                                 clinic_type == "2-Academic HealthSystem" ~ "academic"),
+                            I_magnet = case_when(I_magnet == 1 ~ "Yes",
+                                                 I_magnet == 2 ~ "No",
+                                                 .default = I_magnet),
+                            I_magnet_w_amb_struture = case_when(I_magnet_w_amb_struture == 1 ~ "Yes",
+                                                                I_magnet_w_amb_struture == 2 ~ "No",
+                                                                .default = I_magnet_w_amb_struture),
+                            I_stand_alone = case_when(I_stand_alone == 1 ~ "Yes",
+                                                      I_stand_alone == 2 ~ "No",
+                                                      .default = I_stand_alone),
+                            I_chief_nursing_officer_present = case_when(I_chief_nursing_officer_present == 1 ~ "Yes",
+                                                                        I_chief_nursing_officer_present == 2 ~ "No",
+                                                                        .default = I_chief_nursing_officer_present),
+                            I_coll_barg = case_when(I_coll_barg == 1 ~ "Yes",
+                                                    I_coll_barg == 2 ~ "No",
+                                                    .default = I_coll_barg),
+                            I_cent_rn_staffinng = case_when(I_cent_rn_staffinng == 1 ~ "Yes",
+                                                            I_cent_rn_staffinng == 2 ~ "No",
+                                                            .default = I_cent_rn_staffinng),
+                            I_tele_rn_staffing = case_when(I_tele_rn_staffing == 1 ~ "Yes",
+                                                           I_tele_rn_staffing == 2 ~ "No",
+                                                           .default = I_tele_rn_staffing),
+                            )
+```
+
+```{r, echo=F}
+rstart$n_race_pi <- as.numeric(rstart$n_race_pi)
+rstart$n_race_hawaii[is.na(rstart$n_race_hawaii)] <- 0
+rstart$n_race_pi[is.na(rstart$n_race_pi)] <- 0
+rstart$n_race_aiai[is.na(rstart$n_race_aiai)] <- 0
+rstart$n_race_multi[is.na(rstart$n_race_multi)] <- 0
+rstart$n_race_unreported[is.na(rstart$n_race_unreported)] <- 0
+
+rstart <- rstart %>% mutate(
+  n_race_other = n_race_hawaii + n_race_pi + n_race_aiai + n_race_multi + n_race_unreported,
+  p_race_white = n_race_white / (n_race_white + n_race_black + n_race_asian + n_race_other),
+  n_patients_served_65plus = n_patients_served_66_89 + n_patients_served_over89,
+  p_patients_served_18_40 = n_patients_served_18_40 / (
+    n_patients_served_18_40 + n_patients_served_41_65 +  n_patients_served_65plus
+  ),
+  p_patients_served_41_65 = n_patients_served_41_65 / (
+    n_patients_served_18_40 + n_patients_served_41_65 +  n_patients_served_65plus
+  ),
+  p_patients_served_65plus = n_patients_served_65plus /
+    (
+      n_patients_served_18_40 + n_patients_served_41_65 +  n_patients_served_65plus
+    ),
+  p_private_insurance  = n_private_insurance / (n_private_insurance + n_public_insurance + n_uninsured),
+  p_public_insurance  = n_public_insurance /
+    (n_private_insurance + n_public_insurance + n_uninsured),
+  p_uninsured  = n_uninsured /
+    (n_private_insurance + n_public_insurance + n_uninsured),
+  p_male = n_gender_male / (n_gender_male + n_gender_female),
+  p_female = 1 - p_male,
+  hours_budgeted_apn = as.numeric(hours_budgeted_apn),
+  hours_budgeted_apn = ifelse(is.na(hours_budgeted_apn),0, hours_budgeted_apn),
+  hours_budgeted_contract = as.numeric(hours_budgeted_contract),
+  hours_budgeted_contract = ifelse(is.na(hours_budgeted_contract),0, hours_budgeted_contract),
+  hours_budgeted_pa = as.numeric(hours_budgeted_pa),
+  hours_budgeted_pa = ifelse(is.na(hours_budgeted_pa),0, hours_budgeted_pa),
+  hours_budgeted_md = as.numeric(hours_budgeted_md),
+  hours_budgeted_md = ifelse(is.na(hours_budgeted_md),0, hours_budgeted_md),
+  n_budgeted_total = hours_budgeted_rn + hours_budgeted_ma + hours_budgeted_pa + hours_budgeted_apn + hours_budgeted_md + hours_budgeted_lpn + hours_budgeted_other + hours_budgeted_contract,
+  p_hours_budgeted_rn = hours_budgeted_rn / n_budgeted_total,
+  p_ethnicity_hispanic =   n_ethnicity_hispanic / (n_ethnicity_hispanic + n_ethnicity_non_hispanic), 
+  p_a1c = n_a1c/n_total_visits_served_over18,
+  p_bmi = n_bmi/n_total_visits_served_over18,
+  p_bp = n_bp/n_total_visits_served_over18
+)
+```
+
+```{r, echo=F}
+rstart <- rstart |>
+    filter(!(clinic_name == "3019083950" & month == "2022-09-01"),
+         !(clinic_name == "3019091900" & month == "2022-07-01"),
+         !(clinic_name == "3049025340"),
+         !(clinic_name == "3049000061"),
+         !(clinic_name == "UMMC FM @ ATTICA"),
+         !(clinic_name == "Primary Clinic #18") & 
+         !(clinic_name == "3039000021") ) |>
+  mutate(
+    p_bp = ifelse(p_bp > 1, 1, p_bp),
+    p_bmi = ifelse(p_bmi > 1, 1, p_bmi)
+  ) %>% mutate(org = as.factor(org))
+```
+
+# Models
+
+## BMI
+
+### All Orgs
+
+```{r}
+mod_bmi_assessed_all <- glmer(
+  cbind(n_bmi, n_total_visits_served_over18) ~ org + p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart,
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_assessed_all)
+
+mod_bmi_controlled_all <- glmer(
+  cbind(n_bmi_over30, n_bmi) ~ org + p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart,
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_controlled_all)
+```
+
+### CHN
+
+```{r}
+mod_bmi_assessed_chn <- glmer(
+  cbind(n_bmi, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "chn"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_assessed_chn)
+
+mod_bmi_controlled_chn <- glmer(
+  cbind(n_bmi_over30, n_bmi) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "chn"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_controlled_chn)
+```
+
+### ROC
+
+```{r}
+mod_bmi_assessed_roc <- glmer(
+  cbind(n_bmi, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "roc"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_assessed_roc)
+
+mod_bmi_controlled_roc <- glmer(
+  cbind(n_bmi_over30, n_bmi) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "roc"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_controlled_roc)
+```
+
+### UM
+
+```{r}
+mod_bmi_assessed_um <- glmer(
+  cbind(n_bmi, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "um"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_assessed_um)
+
+mod_bmi_controlled_um <- glmer(
+  cbind(n_bmi_over30, n_bmi) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "um"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_controlled_um)
+```
+
+### WS
+
+```{r}
+mod_bmi_assessed_ws <- glmer(
+  cbind(n_bmi, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "ws"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_assessed_ws)
+
+mod_bmi_controlled_ws <- glmer(
+  cbind(n_bmi_over30, n_bmi) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "ws"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bmi_controlled_ws)
+```
+
+## BP
+
+### All Orgs
+
+```{r}
+mod_bp_assessed_all <- glmer(
+  cbind(n_bp, n_total_visits_served_over18) ~ org + p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart,
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_assessed_all)
+
+mod_bp_controlled_all <- glmer(
+  cbind(n_bp_over140_90, n_bp) ~ org + p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart,
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_controlled_all)
+```
+
+### CHN
+
+```{r}
+mod_bp_assessed_chn <- glmer(
+  cbind(n_bp, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "chn"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_assessed_chn)
+
+mod_bp_controlled_chn <- glmer(
+  cbind(n_bp_over140_90, n_bp) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "chn"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_controlled_chn)
+```
+
+### ROC
+
+```{r}
+mod_bp_assessed_roc <- glmer(
+  cbind(n_bp, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "roc"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_assessed_roc)
+
+mod_bp_controlled_roc <- glmer(
+  cbind(n_bp_over140_90, n_bp) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "roc"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_controlled_roc)
+```
+
+### UM
+
+```{r}
+mod_bp_assessed_um <- glmer(
+  cbind(n_bp, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "um"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_assessed_um)
+
+mod_bp_controlled_um <- glmer(
+  cbind(n_bp_over140_90, n_bp) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "um"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_controlled_um)
+```
+
+### WS
+
+```{r}
+mod_bp_assessed_ws <- glmer(
+  cbind(n_bp, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "ws"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_assessed_ws)
+
+mod_bp_controlled_ws <- glmer(
+  cbind(n_bp_over140_90, n_bp) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "ws"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_bp_controlled_ws)
+```
+
+## A1C
+
+### All Orgs
+
+```{r}
+mod_a1c_assessed_all <- glmer(
+  cbind(n_a1c, n_total_visits_served_over18) ~ org + p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart,
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_assessed_all)
+
+mod_a1c_controlled_all <- glmer(
+  cbind(n_a1c_over9, n_a1c) ~ org + p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart,
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_controlled_all)
+```
+
+### CHN
+
+```{r}
+mod_a1c_assessed_chn <- glmer(
+  cbind(n_a1c, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "chn"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_assessed_chn)
+
+mod_a1c_controlled_chn <- glmer(
+  cbind(n_a1c_over9, n_a1c) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "chn"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_controlled_chn)
+```
+
+### ROC
+
+```{r}
+mod_a1c_assessed_roc <- glmer(
+  cbind(n_a1c, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "roc"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_assessed_roc)
+
+mod_a1c_controlled_roc <- glmer(
+  cbind(n_a1c_over9, n_a1c) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "roc"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_controlled_roc)
+```
+
+### UM
+
+```{r}
+mod_a1c_assessed_um <- glmer(
+  cbind(n_a1c, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "um"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_assessed_um)
+
+mod_a1c_controlled_um <- glmer(
+  cbind(n_a1c_over9, n_a1c) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "um"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_controlled_um)
+```
+
+### WS
+
+```{r}
+mod_a1c_assessed_ws <- glmer(
+  cbind(n_a1c, n_total_visits_served_over18) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "ws"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_assessed_ws)
+
+mod_a1c_controlled_ws <- glmer(
+  cbind(n_a1c_over9, n_a1c) ~ p_female + p_race_white + p_patients_served_41_65 + p_patients_served_65plus + p_uninsured + p_public_insurance + p_ethnicity_hispanic + I(n_budgeted_total/100) + p_hours_budgeted_rn + (1|clinic_name),
+  data = rstart |> filter(org == "ws"),
+  family = "binomial",
+  control=glmerControl(optimizer="bobyqa")
+)
+summary(mod_a1c_controlled_ws)
+```
