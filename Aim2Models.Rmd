@@ -233,6 +233,8 @@ mod_bmi_controlled_all <- glmer(
 summary(mod_bmi_controlled_all)
 ```
 
+
+
 ### CHN
 
 ```{r}
